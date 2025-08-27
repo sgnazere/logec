@@ -35,10 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         switch ($_POST['action']) {
             case 'ajouter':
                 try {
-                    $query = $db->prepare("INSERT INTO employees (nom, prenoms, email, date_naissance, poste, projet, date_embauche, telephone, numero_secu, type_contrat, numero_urgence) VALUES (:nom, :prenoms, :email, :date_naissance, :poste, :projet, :date_embauche, :telephone, :numero_secu, :type_contrat, :numero_urgence)");
+                    $query = $db->prepare("INSERT INTO employees (nom, prenoms, sexe, adresse, email, date_naissance, poste, projet, date_embauche, telephone, numero_secu, type_contrat, numero_urgence) VALUES (:nom, :prenoms, :sexe, :adresse, :email, :date_naissance, :poste, :projet, :date_embauche, :telephone, :numero_secu, :type_contrat, :numero_urgence)");
                     $query->execute([
                         'nom' => $_POST['nom'],
                         'prenoms' => $_POST['prenoms'],
+                        'sexe' => $_POST['sexe'],
+                        'adresse' => $_POST['adresse'],
                         'email' => $_POST['email'],
                         'date_naissance' => $_POST['date_naissance'],
                         'poste' => $_POST['poste'],
@@ -63,11 +65,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'modifier':
                 try {
-                    $query = $db->prepare("UPDATE employees SET nom = :nom, prenoms = :prenoms, email = :email, date_naissance = :date_naissance, poste = :poste, projet = :projet, date_embauche = :date_embauche, telephone = :telephone, numero_secu = :numero_secu, type_contrat = :type_contrat, numero_urgence = :numero_urgence WHERE id = :id");
+                    $query = $db->prepare("UPDATE employees SET nom = :nom, prenoms = :prenoms, sexe = :sexe, adresse = :adresse, email = :email, date_naissance = :date_naissance, poste = :poste, projet = :projet, date_embauche = :date_embauche, telephone = :telephone, numero_secu = :numero_secu, type_contrat = :type_contrat, numero_urgence = :numero_urgence WHERE id = :id");
                     $query->execute([
                         'id' => $_POST['id'],
                         'nom' => $_POST['nom'],
                         'prenoms' => $_POST['prenoms'],
+                        'sexe' => $_POST['sexe'],
+                        'adresse' => $_POST['adresse'],
                         'email' => $_POST['email'],
                         'date_naissance' => $_POST['date_naissance'],
                         'poste' => $_POST['poste'],
@@ -276,7 +280,7 @@ function calculerAnnees($date_embauche) {
             letter-spacing: 0.5px;
         }
 
-        .form-group input, .form-group select {
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.75rem;
             border: 2px solid var(--divider-color);
@@ -284,9 +288,10 @@ function calculerAnnees($date_embauche) {
             font-size: 1rem;
             transition: all 0.3s ease;
             background: var(--white);
+            font-family: inherit;
         }
 
-        .form-group input:focus, .form-group select:focus {
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             border-color: var(--primary-color);
             outline: none;
             box-shadow: 0 0 0 3px var(--primary-light);
@@ -856,6 +861,7 @@ function calculerAnnees($date_embauche) {
     <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
 </head>
 <body>
+    <div id="employee-tooltip" style="display: none; position: absolute; background-color: #333; color: #fff; padding: 10px 15px; border-radius: 6px; z-index: 1000; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 0.9rem; max-width: 300px; white-space: pre-wrap;"></div>
    <div class="container">
         <div class="dashboard">
             <div class="page-header">
@@ -903,6 +909,19 @@ function calculerAnnees($date_embauche) {
                         <div class="form-group">
                             <label for="prenoms">Prénoms</label>
                             <input type="text" name="prenoms" id="prenoms" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Sexe</label>
+                            <div style="display: flex; gap: 1rem; align-items: center; padding-top: 0.5rem;">
+                                <input type="radio" id="sexe_homme" name="sexe" value="Homme" required style="width: auto; height: auto;">
+                                <label for="sexe_homme" style="font-weight: normal; user-select: none;">Homme</label>
+                                <input type="radio" id="sexe_femme" name="sexe" value="Femme" required style="width: auto; height: auto;">
+                                <label for="sexe_femme" style="font-weight: normal; user-select: none;">Femme</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="adresse">Adresse</label>
+                            <textarea id="adresse" name="adresse" rows="2" required></textarea>
                         </div>
                         <div class="form-group">
                             <label for="email">Email</label>
@@ -993,12 +1012,18 @@ function calculerAnnees($date_embauche) {
                             <tr>
                                 <th>Nom</th>
                                 <th>Prénoms</th>
-                                <th>Téléphone</th>
-                                <th>Email</th>
                                 <th>Projet</th>
                                 <th>Type contrat</th>
                                 <th>Poste</th>
                                 <th>Actions</th>
+                                <th>Sexe</th>
+                                <th>Adresse</th>
+                                <th>Téléphone</th>
+                                <th>Email</th>
+                                <th>Date Naissance</th>
+                                <th>Date Embauche</th>
+                                <th>N° Sécu</th>
+                                <th>N° Urgence</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1006,8 +1031,6 @@ function calculerAnnees($date_embauche) {
                                 <tr>
                                     <td><?php echo htmlspecialchars($employe['nom']); ?></td>
                                     <td><?php echo htmlspecialchars($employe['prenoms']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['telephone']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['email']); ?></td>
                                     <td><?php echo htmlspecialchars($employe['projet']); ?></td>
                                     <td><?php echo htmlspecialchars($employe['type_contrat']); ?></td>
                                     <td><?php echo htmlspecialchars($employe['poste']); ?></td>
@@ -1021,6 +1044,14 @@ function calculerAnnees($date_embauche) {
                                             </button>
                                         </div>
                                     </td>
+                                    <td><?php echo htmlspecialchars($employe['sexe'] ?? ''); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['adresse'] ?? ''); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['telephone']); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['email']); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['date_naissance']); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['date_embauche']); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['numero_secu']); ?></td>
+                                    <td><?php echo htmlspecialchars($employe['numero_urgence']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -1066,14 +1097,63 @@ function calculerAnnees($date_embauche) {
             scrollX: false,
             columnDefs: [
                 {
-                    targets: -1,
+                    targets: -1, // La dernière colonne (Actions)
                     orderable: false,
                     searchable: false
+                },
+                {
+                    "visible": false,
+                    "targets": [6, 7, 8, 9, 10, 11, 12, 13]
                 }
             ],
             drawCallback: function() {
                 initializeActionButtons();
             }
+        });
+
+        // Tooltip logic
+        const tooltip = $('#employee-tooltip');
+        $('.employee-table tbody').on('mouseover', 'tr', function(e) {
+            const rowData = table.row(this).data();
+            if (rowData) {
+                const sexe = rowData[6];
+                const adresse = rowData[7];
+                const telephone = rowData[8];
+                const email = rowData[9];
+                const date_naissance = rowData[10];
+                const date_embauche = rowData[11];
+                const numero_secu = rowData[12];
+                const numero_urgence = rowData[13];
+
+                let tooltipContent = '';
+                if (sexe) tooltipContent += `<strong>Sexe:</strong> ${sexe}<br>`;
+                if (adresse) tooltipContent += `<strong>Adresse:</strong> ${adresse}<br>`;
+                if (telephone) tooltipContent += `<strong>Téléphone:</strong> ${telephone}<br>`;
+                if (email) tooltipContent += `<strong>Email:</strong> ${email}<br>`;
+                if (date_naissance) tooltipContent += `<strong>Né(e) le:</strong> ${date_naissance}<br>`;
+                if (date_embauche) tooltipContent += `<strong>Embauché(e) le:</strong> ${date_embauche}<br>`;
+                if (numero_secu) tooltipContent += `<strong>N° Sécu:</strong> ${numero_secu}<br>`;
+                if (numero_urgence) tooltipContent += `<strong>N° Urgence:</strong> ${numero_urgence}`;
+
+                if (tooltipContent.endsWith('<br>')) {
+                    tooltipContent = tooltipContent.slice(0, -4);
+                }
+
+                if (tooltipContent) {
+                    tooltip.html(tooltipContent).css({
+                        display: 'block',
+                        left: e.pageX + 15,
+                        top: e.pageY + 15
+                    }).stop().show();
+                }
+            }
+        }).on('mouseleave', 'tr', function() {
+            tooltip.stop().hide();
+        }).on('mousemove', 'tr', function(e) {
+            tooltip.css({
+                left: e.pageX + 15,
+                top: e.pageY + 15
+            });
         });
 
         // Intercepter la soumission du formulaire
@@ -1302,6 +1382,15 @@ function calculerAnnees($date_embauche) {
                     // Remplir le formulaire avec les données
                     $('#nom').val(employee.nom);
                     $('#prenoms').val(employee.prenoms);
+                    $('#adresse').val(employee.adresse || '');
+                    if (employee.sexe === 'Homme') {
+                        $('#sexe_homme').prop('checked', true);
+                    } else if (employee.sexe === 'Femme') {
+                        $('#sexe_femme').prop('checked', true);
+                    } else {
+                        $('#sexe_homme').prop('checked', false);
+                        $('#sexe_femme').prop('checked', false);
+                    }
                     $('#email').val(employee.email);
                     $('#telephone').val(employee.telephone);
                     $('#numero_urgence').val(employee.numero_urgence);
