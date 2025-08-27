@@ -518,7 +518,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 },
                 order: [[0, 'desc']],
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Tous"]]
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Tous"]],
+                columnDefs: [
+                    { "visible": false, "targets": [3, 4, 6, 7, 9] }
+                ]
             });
 
             // Tooltip logic
@@ -529,9 +532,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (rowData) {
                     const sexe = rowData[3];
                     const adresse = rowData[4];
+                    const type_permis = rowData[6];
+                    const date_expiration = rowData[7];
+                    const email = rowData[9];
 
-                    if ((sexe && sexe.trim() !== '') || (adresse && adresse.trim() !== '')) {
-                        tooltip.html(`<strong>Sexe:</strong> ${sexe || 'N/A'}<br><strong>Adresse:</strong> ${adresse || 'N/A'}`);
+                    let tooltipContent = '';
+                    if (sexe && sexe.trim() !== '') tooltipContent += `<strong>Sexe:</strong> ${sexe}<br>`;
+                    if (adresse && adresse.trim() !== '') tooltipContent += `<strong>Adresse:</strong> ${adresse}<br>`;
+                    if (type_permis && type_permis.trim() !== '') tooltipContent += `<strong>Permis:</strong> ${type_permis}<br>`;
+                    if (date_expiration && date_expiration.trim() !== '') tooltipContent += `<strong>Expiration:</strong> ${date_expiration}<br>`;
+                    if (email && email.trim() !== '') tooltipContent += `<strong>Email:</strong> ${email}`;
+
+                    // Nettoyer la dernière balise <br> si elle existe
+                    if (tooltipContent.endsWith('<br>')) {
+                        tooltipContent = tooltipContent.slice(0, -4);
+                    }
+
+                    if (tooltipContent) {
+                        tooltip.html(tooltipContent);
                         tooltip.css({
                             display: 'block',
                             left: e.pageX + 15,
