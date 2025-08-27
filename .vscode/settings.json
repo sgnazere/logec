@@ -1,0 +1,12 @@
+{
+    "cursor.experimental.aiFeatures": true,
+    "cursor.experimental.ai.enabled": true,
+    "cursor.experimental.ai.model": "gpt-4o-mini",
+    "cursor.experimental.ai.temperature": 0.5,
+    "cursor.experimental.ai.maxTokens": 1000,
+    "cursor.experimental.ai.topP": 1,
+    "cursor.experimental.ai.frequencyPenalty": 0,
+    "cursor.experimental.ai.presencePenalty": 0,
+    "cursor.experimental.ai.stopSequences": [],
+    "cursor.experimental.ai.stopTokens": [],
+}
