@@ -5,8 +5,10 @@ require_once 'config.php';
 
 // Traitement du formulaire d'ajout/modification
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $response = ['success' => false, 'message' => 'Une erreur est survenue.'];
+
     try {
-        $id = isset($_POST['id']) ? $_POST['id'] : null;
+        $id = isset($_POST['id']) && !empty($_POST['id']) ? $_POST['id'] : null;
         $marque = $_POST['marque'];
         $modele = $_POST['modele'];
         $immatriculation = $_POST['immatriculation'];
@@ -19,69 +21,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id) {
             // Modification
-            $stmt = $db->prepare("
-                UPDATE vehicules 
-                SET marque = ?, 
-                    modele = ?, 
-                    immatriculation = ?, 
-                    type_vehicule = ?, 
-                    capacite = ?, 
-                    kilometrage = ?, 
-                    annee_mise_service = ?, 
-                    statut = ?, 
-                    energie = ? 
-                WHERE id = ?
-            ");
-            
-            $result = $stmt->execute([
-                $marque, 
-                $modele, 
-                $immatriculation, 
-                $type_vehicule, 
-                $capacite, 
-                $kilometrage, 
-                $annee_mise_service, 
-                $statut, 
-                $type_carburant, 
-                $id
-            ]);
-
-            if ($result) {
-                $_SESSION['success'] = "Véhicule modifié avec succès.";
-            } else {
-                throw new Exception("Erreur lors de la mise à jour du véhicule");
-            }
+            $stmt = $db->prepare("UPDATE vehicules SET marque = ?, modele = ?, immatriculation = ?, type_vehicule = ?, capacite = ?, kilometrage = ?, annee_mise_service = ?, statut = ?, energie = ? WHERE id = ?");
+            $stmt->execute([$marque, $modele, $immatriculation, $type_vehicule, $capacite, $kilometrage, $annee_mise_service, $statut, $type_carburant, $id]);
+            $message = "Véhicule modifié avec succès.";
         } else {
             // Ajout
-            $stmt = $db->prepare("
-                INSERT INTO vehicules 
-                (marque, modele, immatriculation, type_vehicule, capacite, kilometrage, annee_mise_service, statut, energie) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            
-            $result = $stmt->execute([
-                $marque, 
-                $modele, 
-                $immatriculation, 
-                $type_vehicule, 
-                $capacite, 
-                $kilometrage, 
-                $annee_mise_service, 
-                $statut, 
-                $type_carburant
-            ]);
-
-            if ($result) {
-                $_SESSION['success'] = "Véhicule ajouté avec succès.";
-            } else {
-                throw new Exception("Erreur lors de l'ajout du véhicule");
-            }
+            $stmt = $db->prepare("INSERT INTO vehicules (marque, modele, immatriculation, type_vehicule, capacite, kilometrage, annee_mise_service, statut, energie) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$marque, $modele, $immatriculation, $type_vehicule, $capacite, $kilometrage, $annee_mise_service, $statut, $type_carburant]);
+            $id = $db->lastInsertId();
+            $message = "Véhicule ajouté avec succès.";
         }
+
+        // Récupérer les données mises à jour
+        $stmt = $db->prepare("SELECT * FROM vehicules WHERE id = ?");
+        $stmt->execute([$id]);
+        $vehicule = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $response = ['success' => true, 'message' => $message, 'data' => $vehicule];
+
     } catch (Exception $e) {
-        $_SESSION['error'] = "Erreur lors de l'opération : " . $e->getMessage();
+        $response['message'] = "Erreur lors de l'opération : " . $e->getMessage();
         error_log("Erreur SQL : " . $e->getMessage());
     }
-    
+
+    // Si AJAX, renvoyer JSON
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode($response);
+        exit();
+    }
+
+    // Comportement non-AJAX
+    if ($response['success']) {
+        $_SESSION['success'] = $response['message'];
+    } else {
+        $_SESSION['error'] = $response['message'];
+    }
     header('Location: gerer_vehicules.php');
     exit();
 }
@@ -708,7 +683,79 @@ try {
         // Réinitialiser le formulaire
         document.getElementById('vehiculeForm').addEventListener('reset', function() {
             document.getElementById('vehicule_id').value = '';
+            document.querySelector('.form-title').innerHTML = '<i class="fas fa-plus-circle"></i> Ajouter un véhicule';
         });
+
+        // Soumission du formulaire en AJAX
+        $('#vehiculeForm').on('submit', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            const submitBtn = form.find('button[type="submit"]');
+            const originalBtnText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Enregistrement...').prop('disabled', true);
+
+            fetch('gerer_vehicules.php', {
+                method: 'POST',
+                body: new FormData(this)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateVehiculeInTable(data.data);
+                    showNotification(data.message, 'success');
+                    form[0].reset();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Une erreur de connexion est survenue.', 'error');
+                console.error('Erreur:', error);
+            })
+            .finally(() => {
+                submitBtn.html(originalBtnText).prop('disabled', false);
+            });
+        });
+
+        function updateVehiculeInTable(vehicule) {
+            const rowData = [
+                vehicule.marque,
+                vehicule.modele,
+                vehicule.immatriculation,
+                vehicule.type_vehicule,
+                vehicule.capacite,
+                new Intl.NumberFormat('fr-FR').format(vehicule.kilometrage) + ' km',
+                vehicule.annee_mise_service,
+                vehicule.energie,
+                `<span class="status-badge ${vehicule.statut.toLowerCase()}">${vehicule.statut.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>`,
+                `<div class="action-buttons">
+                    <button onclick='editVehicule(${JSON.stringify(vehicule)})' class="edit-btn"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteVehicule(${vehicule.id})" class="delete-btn"><i class="fas fa-trash"></i></button>
+                 </div>`
+            ];
+
+            let rowNode = dataTable.rows().nodes().toArray().find(row => $(row).find('td:eq(2)').text() == vehicule.immatriculation);
+
+            if (rowNode) {
+                dataTable.row(rowNode).data(rowData).draw(false);
+            } else {
+                dataTable.row.add(rowData).draw(false);
+            }
+        }
+
+        function showNotification(message, type) {
+            $('.alert').remove();
+            const alertHtml = `
+                <div class="alert alert-${type === 'success' ? 'success' : 'error'}">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                    ${message}
+                </div>`;
+            $('.page-header').after(alertHtml);
+
+            setTimeout(() => {
+                $('.alert').fadeOut('slow', function() { $(this).remove(); });
+            }, 5000);
+        }
     </script>
 </body>
 </html> 

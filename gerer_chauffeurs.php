@@ -5,7 +5,9 @@ require_once 'config.php';
 
 // Traitement du formulaire d'ajout/modification
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = isset($_POST['id']) ? $_POST['id'] : null;
+    $response = ['success' => false, 'message' => 'Une erreur est survenue.'];
+
+    $id = isset($_POST['id']) && !empty($_POST['id']) ? $_POST['id'] : null;
     $nom = $_POST['nom'];
     $prenoms = $_POST['prenoms'];
     $sexe = $_POST['sexe'];
@@ -22,17 +24,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Modification
             $stmt = $db->prepare("UPDATE chauffeurs SET nom = ?, prenoms = ?, sexe = ?, adresse = ?, numero_permis = ?, type_permis = ?, date_expiration_permis = ?, telephone = ?, email = ?, statut = ? WHERE id = ?");
             $stmt->execute([$nom, $prenoms, $sexe, $adresse, $numero_permis, $type_permis, $date_expiration_permis, $telephone, $email, $statut, $id]);
-            $_SESSION['success'] = "Chauffeur modifié avec succès.";
+            $message = "Chauffeur modifié avec succès.";
         } else {
             // Ajout
             $stmt = $db->prepare("INSERT INTO chauffeurs (nom, prenoms, sexe, adresse, numero_permis, type_permis, date_expiration_permis, telephone, email, statut) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$nom, $prenoms, $sexe, $adresse, $numero_permis, $type_permis, $date_expiration_permis, $telephone, $email, $statut]);
-            $_SESSION['success'] = "Chauffeur ajouté avec succès.";
+            $id = $db->lastInsertId();
+            $message = "Chauffeur ajouté avec succès.";
         }
+
+        // Récupérer les données mises à jour pour la réponse
+        $stmt = $db->prepare("SELECT * FROM chauffeurs WHERE id = ?");
+        $stmt->execute([$id]);
+        $chauffeur = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $response = [
+            'success' => true,
+            'message' => $message,
+            'data' => $chauffeur
+        ];
+
     } catch (PDOException $e) {
-        $_SESSION['error'] = "Erreur lors de l'opération : " . $e->getMessage();
+        $response['message'] = "Erreur lors de l'opération : " . $e->getMessage();
     }
-    
+
+    // Si la requête est AJAX, renvoyer JSON
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode($response);
+        exit();
+    }
+
+    // Comportement normal pour les soumissions non-AJAX
+    if ($response['success']) {
+        $_SESSION['success'] = $response['message'];
+    } else {
+        $_SESSION['error'] = $response['message'];
+    }
     header('Location: gerer_chauffeurs.php');
     exit();
 }
@@ -615,6 +643,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     alert('Une erreur est survenue lors de la suppression');
                 });
             }
+        }
+
+        // Soumission du formulaire en AJAX
+        $('#chauffeurForm').on('submit', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            const submitBtn = form.find('button[type="submit"]');
+            const originalBtnText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Enregistrement...').prop('disabled', true);
+
+            fetch('gerer_chauffeurs.php', {
+                method: 'POST',
+                body: new FormData(this)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mettre à jour la table
+                    updateChauffeurInTable(data.data);
+
+                    // Afficher message succès
+                    showNotification(data.message, 'success');
+
+                    // Réinitialiser le formulaire
+                    form[0].reset();
+                    $('#chauffeur_id').val('');
+                    $('.form-title').html('<i class="fas fa-user-plus"></i> Ajouter un chauffeur');
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Une erreur de connexion est survenue.', 'error');
+                console.error('Erreur:', error);
+            })
+            .finally(() => {
+                submitBtn.html(originalBtnText).prop('disabled', false);
+            });
+        });
+
+        function updateChauffeurInTable(chauffeur) {
+            const rowData = [
+                chauffeur.id,
+                chauffeur.nom,
+                chauffeur.prenoms,
+                chauffeur.sexe,
+                chauffeur.adresse,
+                chauffeur.numero_permis,
+                chauffeur.type_permis,
+                new Date(chauffeur.date_expiration_permis).toLocaleDateString('fr-FR'),
+                chauffeur.telephone,
+                chauffeur.email,
+                `<span class="statut-${chauffeur.statut}">${chauffeur.statut.charAt(0).toUpperCase() + chauffeur.statut.slice(1)}</span>`,
+                `<div class="action-buttons">
+                    <button onclick='editChauffeur(${JSON.stringify(chauffeur)})' class="btn-edit" title="Modifier"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteChauffeur(${chauffeur.id})" class="btn-delete" title="Supprimer"><i class="fas fa-trash"></i></button>
+                 </div>`
+            ];
+
+            // Chercher si la ligne existe déjà
+            let rowNode = dataTable.rows().nodes().toArray().find(row => $(row).find('td:first').text() == chauffeur.id);
+
+            if (rowNode) {
+                // Mettre à jour la ligne existante
+                dataTable.row(rowNode).data(rowData).draw(false);
+            } else {
+                // Ajouter une nouvelle ligne
+                dataTable.row.add(rowData).draw(false);
+            }
+        }
+
+        function showNotification(message, type) {
+            $('.alert').remove(); // Supprimer les anciennes alertes
+            const alertHtml = `
+                <div class="alert alert-${type === 'success' ? 'success' : 'error'}">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                    ${message}
+                </div>`;
+            $('.page-header').after(alertHtml);
+
+            // Auto-hide
+            setTimeout(() => {
+                $('.alert').fadeOut('slow', function() { $(this).remove(); });
+            }, 5000);
         }
 
         document.getElementById('chauffeurForm').addEventListener('reset', function() {
