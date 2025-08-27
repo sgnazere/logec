@@ -448,6 +448,7 @@ try {
     </style>
 </head>
 <body>
+    <div id="vehicule-tooltip" style="display: none; position: absolute; background-color: #333; color: #fff; padding: 10px 15px; border-radius: 6px; z-index: 1000; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 0.9rem; max-width: 250px; white-space: pre-wrap;"></div>
     <div class="dashboard">
         <div class="page-header">
             <h2><i class="fas fa-car"></i> Gestion des Véhicules</h2>
@@ -630,7 +631,49 @@ try {
                 },
                 order: [[0, 'desc']],
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Tous"]]
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Tous"]],
+                columnDefs: [
+                    { "visible": false, "targets": [4, 5, 6, 7] }
+                ]
+            });
+
+            // Tooltip logic
+            const tooltip = $('#vehicule-tooltip');
+
+            $('#vehiculesTable tbody').on('mouseover', 'tr', function(e) {
+                const rowData = dataTable.row(this).data();
+                if (rowData) {
+                    const capacite = rowData[4];
+                    const kilometrage = rowData[5];
+                    const annee = rowData[6];
+                    const energie = rowData[7];
+
+                    let tooltipContent = '';
+                    if (capacite && capacite.trim() !== '') tooltipContent += `<strong>Capacité:</strong> ${capacite} places<br>`;
+                    if (kilometrage && kilometrage.trim() !== '') tooltipContent += `<strong>Kilométrage:</strong> ${kilometrage}<br>`;
+                    if (annee && annee.trim() !== '') tooltipContent += `<strong>Année:</strong> ${annee}<br>`;
+                    if (energie && energie.trim() !== '') tooltipContent += `<strong>Énergie:</strong> ${energie}`;
+
+                    if (tooltipContent.endsWith('<br>')) {
+                        tooltipContent = tooltipContent.slice(0, -4);
+                    }
+
+                    if (tooltipContent) {
+                        tooltip.html(tooltipContent);
+                        tooltip.css({
+                            display: 'block',
+                            left: e.pageX + 15,
+                            top: e.pageY + 15
+                        }).stop().show();
+                    }
+                }
+            }).on('mouseleave', 'tr', function() {
+                tooltip.stop().hide();
+            }).on('mousemove', 'tr', function(e) {
+                tooltip.css({
+                    left: e.pageX + 15,
+                    top: e.pageY + 15
+                });
             });
         });
 
