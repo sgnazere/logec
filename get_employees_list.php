@@ -27,17 +27,12 @@ try {
 
         // Préparer les données pour DataTables
         $data[] = [
-            htmlspecialchars($employe['nom']),
-            htmlspecialchars($employe['prenoms']),
-            htmlspecialchars($employe['telephone'] ?: '-'),
-            htmlspecialchars($employe['email'] ?: '-'),
-            htmlspecialchars($employe['projet'] ?: '-'),
-            htmlspecialchars($employe['type_contrat'] ?: '-'),
-            htmlspecialchars($employe['poste'] ?: '-'),
-            htmlspecialchars($employe['nom_service'] ?: '-'),
-            $date_naissance,
-            $date_embauche,
-            // Boutons d'action pour modifier/supprimer
+            htmlspecialchars($employe['nom']), // 0
+            htmlspecialchars($employe['prenoms']), // 1
+            htmlspecialchars($employe['projet'] ?: '-'), // 2
+            htmlspecialchars($employe['type_contrat'] ?: '-'), // 3
+            htmlspecialchars($employe['poste'] ?: '-'), // 4
+            // Actions // 5
             sprintf(
                 '<div class="action-buttons">
                     <button type="button" class="btn btn-edit" data-id="%d" title="Modifier">
@@ -49,7 +44,17 @@ try {
                 </div>',
                 (int)$employe['id'],
                 (int)$employe['id']
-            )
+            ),
+            // Colonnes cachées pour l'infobulle
+            htmlspecialchars($employe['sexe'] ?? '-'), // 6
+            htmlspecialchars($employe['adresse'] ?? '-'), // 7
+            htmlspecialchars($employe['telephone'] ?: '-'), // 8
+            htmlspecialchars($employe['email'] ?: '-'), // 9
+            $date_naissance, // 10
+            $date_embauche, // 11
+            htmlspecialchars($employe['numero_secu'] ?? '-'), // 12
+            htmlspecialchars($employe['numero_urgence'] ?? '-'), // 13
+            htmlspecialchars($employe['nom_service'] ?: '-') // 14
         ];
     }
 

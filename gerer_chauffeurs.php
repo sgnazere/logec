@@ -5,9 +5,13 @@ require_once 'config.php';
 
 // Traitement du formulaire d'ajout/modification
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = isset($_POST['id']) ? $_POST['id'] : null;
+    $response = ['success' => false, 'message' => 'Une erreur est survenue.'];
+
+    $id = isset($_POST['id']) && !empty($_POST['id']) ? $_POST['id'] : null;
     $nom = $_POST['nom'];
     $prenoms = $_POST['prenoms'];
+    $sexe = $_POST['sexe'];
+    $adresse = $_POST['adresse'];
     $numero_permis = $_POST['numero_permis'];
     $type_permis = $_POST['type_permis'];
     $date_expiration_permis = $_POST['date_expiration_permis'];
@@ -18,19 +22,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($id) {
             // Modification
-            $stmt = $db->prepare("UPDATE chauffeurs SET nom = ?, prenoms = ?, numero_permis = ?, type_permis = ?, date_expiration_permis = ?, telephone = ?, email = ?, statut = ? WHERE id = ?");
-            $stmt->execute([$nom, $prenoms, $numero_permis, $type_permis, $date_expiration_permis, $telephone, $email, $statut, $id]);
-            $_SESSION['success'] = "Chauffeur modifié avec succès.";
+            $stmt = $db->prepare("UPDATE chauffeurs SET nom = ?, prenoms = ?, sexe = ?, adresse = ?, numero_permis = ?, type_permis = ?, date_expiration_permis = ?, telephone = ?, email = ?, statut = ? WHERE id = ?");
+            $stmt->execute([$nom, $prenoms, $sexe, $adresse, $numero_permis, $type_permis, $date_expiration_permis, $telephone, $email, $statut, $id]);
+            $message = "Chauffeur modifié avec succès.";
         } else {
             // Ajout
-            $stmt = $db->prepare("INSERT INTO chauffeurs (nom, prenoms, numero_permis, type_permis, date_expiration_permis, telephone, email, statut) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$nom, $prenoms, $numero_permis, $type_permis, $date_expiration_permis, $telephone, $email, $statut]);
-            $_SESSION['success'] = "Chauffeur ajouté avec succès.";
+            $stmt = $db->prepare("INSERT INTO chauffeurs (nom, prenoms, sexe, adresse, numero_permis, type_permis, date_expiration_permis, telephone, email, statut) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$nom, $prenoms, $sexe, $adresse, $numero_permis, $type_permis, $date_expiration_permis, $telephone, $email, $statut]);
+            $id = $db->lastInsertId();
+            $message = "Chauffeur ajouté avec succès.";
         }
+
+        // Récupérer les données mises à jour pour la réponse
+        $stmt = $db->prepare("SELECT * FROM chauffeurs WHERE id = ?");
+        $stmt->execute([$id]);
+        $chauffeur = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $response = [
+            'success' => true,
+            'message' => $message,
+            'data' => $chauffeur
+        ];
+
     } catch (PDOException $e) {
-        $_SESSION['error'] = "Erreur lors de l'opération : " . $e->getMessage();
+        $response['message'] = "Erreur lors de l'opération : " . $e->getMessage();
     }
-    
+
+    // Si la requête est AJAX, renvoyer JSON
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode($response);
+        exit();
+    }
+
+    // Comportement normal pour les soumissions non-AJAX
+    if ($response['success']) {
+        $_SESSION['success'] = $response['message'];
+    } else {
+        $_SESSION['error'] = $response['message'];
+    }
     header('Location: gerer_chauffeurs.php');
     exit();
 }
@@ -163,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             letter-spacing: 0.5px;
         }
 
-        .form-group input {
+        .form-group input, .form-group textarea {
             width: 100%;
             padding: 0.75rem;
             border: 2px solid var(--divider-color);
@@ -171,9 +201,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 1rem;
             transition: all 0.3s ease;
             background: var(--white);
+            font-family: inherit;
         }
 
-        .form-group input:focus {
+        .form-group input:focus, .form-group textarea:focus {
             border-color: var(--primary-color);
             outline: none;
             box-shadow: 0 0 0 3px var(--primary-light);
@@ -349,6 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
+    <div id="chauffeur-tooltip" style="display: none; position: absolute; background-color: #333; color: #fff; padding: 10px 15px; border-radius: 6px; z-index: 1000; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 0.9rem; max-width: 250px; white-space: pre-wrap;"></div>
     <div class="dashboard">
         <div class="page-header">
             <h2><i class="fas fa-id-card"></i> Gestion des Chauffeurs</h2>
@@ -389,6 +421,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="form-group">
                         <label for="prenoms">Prénoms</label>
                         <input type="text" id="prenoms" name="prenoms" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Sexe</label>
+                        <div style="display: flex; gap: 1rem; align-items: center; padding-top: 0.5rem;">
+                            <input type="radio" id="sexe_homme" name="sexe" value="Homme" required style="width: auto; height: auto;">
+                            <label for="sexe_homme" style="font-weight: normal; user-select: none;">Homme</label>
+                            <input type="radio" id="sexe_femme" name="sexe" value="Femme" required style="width: auto; height: auto;">
+                            <label for="sexe_femme" style="font-weight: normal; user-select: none;">Femme</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="adresse">Adresse</label>
+                        <textarea id="adresse" name="adresse" rows="2" required></textarea>
                     </div>
                     <div class="form-group">
                         <label for="numero_permis">Numéro de permis</label>
@@ -443,6 +488,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <th>ID</th>
                         <th>Nom</th>
                         <th>Prénoms</th>
+                        <th>Sexe</th>
+                        <th>Adresse</th>
                         <th>N° Permis</th>
                         <th>Type Permis</th>
                         <th>Date Expiration</th>
@@ -461,6 +508,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <td><?php echo $chauffeur['id']; ?></td>
                         <td><?php echo htmlspecialchars($chauffeur['nom']); ?></td>
                         <td><?php echo htmlspecialchars($chauffeur['prenoms']); ?></td>
+                        <td><?php echo htmlspecialchars($chauffeur['sexe'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($chauffeur['adresse'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($chauffeur['numero_permis']); ?></td>
                         <td><?php echo htmlspecialchars($chauffeur['type_permis']); ?></td>
                         <td><?php echo date('d/m/Y', strtotime($chauffeur['date_expiration_permis'])); ?></td>
@@ -497,7 +546,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 },
                 order: [[0, 'desc']],
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Tous"]]
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Tous"]],
+                columnDefs: [
+                    { "visible": false, "targets": [3, 4, 6, 7, 9] }
+                ]
+            });
+
+            // Tooltip logic
+            const tooltip = $('#chauffeur-tooltip');
+
+            $('#chauffeursTable tbody').on('mouseover', 'tr', function(e) {
+                const rowData = dataTable.row(this).data();
+                if (rowData) {
+                    const sexe = rowData[3];
+                    const adresse = rowData[4];
+                    const type_permis = rowData[6];
+                    const date_expiration = rowData[7];
+                    const email = rowData[9];
+
+                    let tooltipContent = '';
+                    if (sexe && sexe.trim() !== '') tooltipContent += `<strong>Sexe:</strong> ${sexe}<br>`;
+                    if (adresse && adresse.trim() !== '') tooltipContent += `<strong>Adresse:</strong> ${adresse}<br>`;
+                    if (type_permis && type_permis.trim() !== '') tooltipContent += `<strong>Permis:</strong> ${type_permis}<br>`;
+                    if (date_expiration && date_expiration.trim() !== '') tooltipContent += `<strong>Expiration:</strong> ${date_expiration}<br>`;
+                    if (email && email.trim() !== '') tooltipContent += `<strong>Email:</strong> ${email}`;
+
+                    // Nettoyer la dernière balise <br> si elle existe
+                    if (tooltipContent.endsWith('<br>')) {
+                        tooltipContent = tooltipContent.slice(0, -4);
+                    }
+
+                    if (tooltipContent) {
+                        tooltip.html(tooltipContent);
+                        tooltip.css({
+                            display: 'block',
+                            left: e.pageX + 15,
+                            top: e.pageY + 15
+                        }).stop().show();
+                    }
+                }
+            }).on('mouseleave', 'tr', function() {
+                tooltip.stop().hide();
+            }).on('mousemove', 'tr', function(e) {
+                tooltip.css({
+                    left: e.pageX + 15,
+                    top: e.pageY + 15
+                });
             });
         });
 
@@ -505,6 +599,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             document.getElementById('chauffeur_id').value = chauffeur.id;
             document.getElementById('nom').value = chauffeur.nom;
             document.getElementById('prenoms').value = chauffeur.prenoms;
+            document.getElementById('adresse').value = chauffeur.adresse || '';
+
+            if (chauffeur.sexe === 'Homme') {
+                document.getElementById('sexe_homme').checked = true;
+            } else if (chauffeur.sexe === 'Femme') {
+                document.getElementById('sexe_femme').checked = true;
+            } else {
+                document.getElementById('sexe_homme').checked = false;
+                document.getElementById('sexe_femme').checked = false;
+            }
+
             document.getElementById('numero_permis').value = chauffeur.numero_permis;
             document.getElementById('type_permis').value = chauffeur.type_permis;
             document.getElementById('date_expiration_permis').value = chauffeur.date_expiration_permis;
@@ -512,6 +617,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             document.getElementById('email').value = chauffeur.email;
             document.getElementById('statut').value = chauffeur.statut;
             
+            document.querySelector('.form-title').innerHTML = '<i class="fas fa-user-edit"></i> Modifier un chauffeur';
             document.querySelector('.chauffeur-form-container').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -539,8 +645,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Soumission du formulaire en AJAX
+        $('#chauffeurForm').on('submit', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            const submitBtn = form.find('button[type="submit"]');
+            const originalBtnText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Enregistrement...').prop('disabled', true);
+
+            fetch('gerer_chauffeurs.php', {
+                method: 'POST',
+                body: new FormData(this)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mettre à jour la table
+                    updateChauffeurInTable(data.data);
+
+                    // Afficher message succès
+                    showNotification(data.message, 'success');
+
+                    // Réinitialiser le formulaire
+                    form[0].reset();
+                    $('#chauffeur_id').val('');
+                    $('.form-title').html('<i class="fas fa-user-plus"></i> Ajouter un chauffeur');
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Une erreur de connexion est survenue.', 'error');
+                console.error('Erreur:', error);
+            })
+            .finally(() => {
+                submitBtn.html(originalBtnText).prop('disabled', false);
+            });
+        });
+
+        function updateChauffeurInTable(chauffeur) {
+            const rowData = [
+                chauffeur.id,
+                chauffeur.nom,
+                chauffeur.prenoms,
+                chauffeur.sexe,
+                chauffeur.adresse,
+                chauffeur.numero_permis,
+                chauffeur.type_permis,
+                new Date(chauffeur.date_expiration_permis).toLocaleDateString('fr-FR'),
+                chauffeur.telephone,
+                chauffeur.email,
+                `<span class="statut-${chauffeur.statut}">${chauffeur.statut.charAt(0).toUpperCase() + chauffeur.statut.slice(1)}</span>`,
+                `<div class="action-buttons">
+                    <button onclick='editChauffeur(${JSON.stringify(chauffeur)})' class="btn-edit" title="Modifier"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteChauffeur(${chauffeur.id})" class="btn-delete" title="Supprimer"><i class="fas fa-trash"></i></button>
+                 </div>`
+            ];
+
+            // Chercher si la ligne existe déjà
+            let rowNode = dataTable.rows().nodes().toArray().find(row => $(row).find('td:first').text() == chauffeur.id);
+
+            if (rowNode) {
+                // Mettre à jour la ligne existante
+                dataTable.row(rowNode).data(rowData).draw(false);
+            } else {
+                // Ajouter une nouvelle ligne
+                dataTable.row.add(rowData).draw(false);
+            }
+        }
+
+        function showNotification(message, type) {
+            $('.alert').remove(); // Supprimer les anciennes alertes
+            const alertHtml = `
+                <div class="alert alert-${type === 'success' ? 'success' : 'error'}">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                    ${message}
+                </div>`;
+            $('.page-header').after(alertHtml);
+
+            // Auto-hide
+            setTimeout(() => {
+                $('.alert').fadeOut('slow', function() { $(this).remove(); });
+            }, 5000);
+        }
+
         document.getElementById('chauffeurForm').addEventListener('reset', function() {
             document.getElementById('chauffeur_id').value = '';
+            document.querySelector('.form-title').innerHTML = '<i class="fas fa-user-plus"></i> Ajouter un chauffeur';
         });
     </script>
 </body>

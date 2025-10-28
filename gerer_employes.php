@@ -35,10 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         switch ($_POST['action']) {
             case 'ajouter':
                 try {
-                    $query = $db->prepare("INSERT INTO employees (nom, prenoms, email, date_naissance, poste, projet, date_embauche, telephone, numero_secu, type_contrat, numero_urgence) VALUES (:nom, :prenoms, :email, :date_naissance, :poste, :projet, :date_embauche, :telephone, :numero_secu, :type_contrat, :numero_urgence)");
+                    $query = $db->prepare("INSERT INTO employees (nom, prenoms, sexe, adresse, email, date_naissance, poste, projet, date_embauche, telephone, numero_secu, type_contrat, numero_urgence) VALUES (:nom, :prenoms, :sexe, :adresse, :email, :date_naissance, :poste, :projet, :date_embauche, :telephone, :numero_secu, :type_contrat, :numero_urgence)");
                     $query->execute([
                         'nom' => $_POST['nom'],
                         'prenoms' => $_POST['prenoms'],
+                        'sexe' => $_POST['sexe'],
+                        'adresse' => $_POST['adresse'],
                         'email' => $_POST['email'],
                         'date_naissance' => $_POST['date_naissance'],
                         'poste' => $_POST['poste'],
@@ -63,11 +65,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'modifier':
                 try {
-                    $query = $db->prepare("UPDATE employees SET nom = :nom, prenoms = :prenoms, email = :email, date_naissance = :date_naissance, poste = :poste, projet = :projet, date_embauche = :date_embauche, telephone = :telephone, numero_secu = :numero_secu, type_contrat = :type_contrat, numero_urgence = :numero_urgence WHERE id = :id");
+                    $query = $db->prepare("UPDATE employees SET nom = :nom, prenoms = :prenoms, sexe = :sexe, adresse = :adresse, email = :email, date_naissance = :date_naissance, poste = :poste, projet = :projet, date_embauche = :date_embauche, telephone = :telephone, numero_secu = :numero_secu, type_contrat = :type_contrat, numero_urgence = :numero_urgence WHERE id = :id");
                     $query->execute([
                         'id' => $_POST['id'],
                         'nom' => $_POST['nom'],
                         'prenoms' => $_POST['prenoms'],
+                        'sexe' => $_POST['sexe'],
+                        'adresse' => $_POST['adresse'],
                         'email' => $_POST['email'],
                         'date_naissance' => $_POST['date_naissance'],
                         'poste' => $_POST['poste'],
@@ -276,7 +280,7 @@ function calculerAnnees($date_embauche) {
             letter-spacing: 0.5px;
         }
 
-        .form-group input, .form-group select {
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.75rem;
             border: 2px solid var(--divider-color);
@@ -284,9 +288,10 @@ function calculerAnnees($date_embauche) {
             font-size: 1rem;
             transition: all 0.3s ease;
             background: var(--white);
+            font-family: inherit;
         }
 
-        .form-group input:focus, .form-group select:focus {
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             border-color: var(--primary-color);
             outline: none;
             box-shadow: 0 0 0 3px var(--primary-light);
@@ -856,6 +861,7 @@ function calculerAnnees($date_embauche) {
     <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
 </head>
 <body>
+    <div id="employee-tooltip" style="display: none; position: absolute; background-color: #333; color: #fff; padding: 10px 15px; border-radius: 6px; z-index: 1000; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 0.9rem; max-width: 300px; white-space: pre-wrap;"></div>
    <div class="container">
         <div class="dashboard">
             <div class="page-header">
@@ -903,6 +909,19 @@ function calculerAnnees($date_embauche) {
                         <div class="form-group">
                             <label for="prenoms">Prénoms</label>
                             <input type="text" name="prenoms" id="prenoms" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Sexe</label>
+                            <div style="display: flex; gap: 1rem; align-items: center; padding-top: 0.5rem;">
+                                <input type="radio" id="sexe_homme" name="sexe" value="Homme" required style="width: auto; height: auto;">
+                                <label for="sexe_homme" style="font-weight: normal; user-select: none;">Homme</label>
+                                <input type="radio" id="sexe_femme" name="sexe" value="Femme" required style="width: auto; height: auto;">
+                                <label for="sexe_femme" style="font-weight: normal; user-select: none;">Femme</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="adresse">Adresse</label>
+                            <textarea id="adresse" name="adresse" rows="2" required></textarea>
                         </div>
                         <div class="form-group">
                             <label for="email">Email</label>
@@ -993,36 +1012,23 @@ function calculerAnnees($date_embauche) {
                             <tr>
                                 <th>Nom</th>
                                 <th>Prénoms</th>
-                                <th>Téléphone</th>
-                                <th>Email</th>
                                 <th>Projet</th>
                                 <th>Type contrat</th>
                                 <th>Poste</th>
                                 <th>Actions</th>
+                                <th>Sexe</th>
+                                <th>Adresse</th>
+                                <th>Téléphone</th>
+                                <th>Email</th>
+                                <th>Date Naissance</th>
+                                <th>Date Embauche</th>
+                                <th>N° Sécu</th>
+                                <th>N° Urgence</th>
+                                <th>Service</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($employes as $employe): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($employe['nom']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['prenoms']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['telephone']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['email']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['projet']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['type_contrat']); ?></td>
-                                    <td><?php echo htmlspecialchars($employe['poste']); ?></td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <button type="button" class="btn btn-edit" data-id="<?php echo $employe['id']; ?>" title="Modifier">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-delete" data-id="<?php echo $employe['id']; ?>" title="Supprimer">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
+                            <!-- Le corps sera rempli par DataTables AJAX -->
                         </tbody>
                     </table>
                 </div>
@@ -1064,11 +1070,19 @@ function calculerAnnees($date_embauche) {
             pageLength: 10,
             order: [[0, 'asc']],
             scrollX: false,
+            ajax: {
+                url: 'get_employees_list.php',
+                dataSrc: 'data'
+            },
             columnDefs: [
                 {
-                    targets: -1,
+                    targets: 5, // Colonne Actions
                     orderable: false,
                     searchable: false
+                },
+                {
+                    "visible": false,
+                    "targets": [6, 7, 8, 9, 10, 11, 12, 13, 14]
                 }
             ],
             drawCallback: function() {
@@ -1076,78 +1090,107 @@ function calculerAnnees($date_embauche) {
             }
         });
 
-        // Intercepter la soumission du formulaire
-        $('form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const action = $('form').find('input[name="action"]').val();
-            
-            // Si c'est une modification, on soumet directement le formulaire
-            if (action === 'modifier') {
-                submitForm();
-                return;
-            }
-            
-            // Pour un nouvel employé, on vérifie les doublons
-            const nom = $('#nom').val();
-            const prenoms = $('#prenoms').val();
-            
-            // Vérifier d'abord s'il y a un doublon
-            $.ajax({
-                url: 'check_duplicate_employee.php',
-                method: 'GET',
-                data: {
-                    nom: nom,
-                    prenoms: prenoms
-                },
-                success: function(response) {
-                    if (response.exists) {
-                        // Afficher un message d'erreur avec les détails de l'employé existant
-                        const message = response.message + "\n\n" +
-                            "Détails de l'employé existant :\n" +
-                            "Nom : " + response.employee.nom + "\n" +
-                            "Prénoms : " + response.employee.prenoms + "\n" +
-                            "Poste : " + response.employee.poste;
-                        
-                        alert(message);
-                    } else {
-                        // Pas de doublon, on peut soumettre le formulaire
-                        submitForm();
-                    }
-                },
-                error: function(xhr, status, error) {
-                    showMessage('Erreur lors de la vérification des doublons: ' + error, 'error');
+        // Tooltip logic
+        const tooltip = $('#employee-tooltip');
+        $('.employee-table tbody').on('mouseover', 'tr', function(e) {
+            const rowData = table.row(this).data();
+            if (rowData) {
+                const sexe = rowData[6];
+                const adresse = rowData[7];
+                const telephone = rowData[8];
+                const email = rowData[9];
+                const date_naissance = rowData[10];
+                const date_embauche = rowData[11];
+                const numero_secu = rowData[12];
+                const numero_urgence = rowData[13];
+                const service = rowData[14];
+
+                let tooltipContent = '';
+                if (sexe && sexe !== '-') tooltipContent += `<strong>Sexe:</strong> ${sexe}<br>`;
+                if (adresse && adresse !== '-') tooltipContent += `<strong>Adresse:</strong> ${adresse}<br>`;
+                if (telephone && telephone !== '-') tooltipContent += `<strong>Téléphone:</strong> ${telephone}<br>`;
+                if (email && email !== '-') tooltipContent += `<strong>Email:</strong> ${email}<br>`;
+                if (date_naissance && date_naissance !== '-') tooltipContent += `<strong>Né(e) le:</strong> ${date_naissance}<br>`;
+                if (date_embauche && date_embauche !== '-') tooltipContent += `<strong>Embauché(e) le:</strong> ${date_embauche}<br>`;
+                if (numero_secu && numero_secu !== '-') tooltipContent += `<strong>N° Sécu:</strong> ${numero_secu}<br>`;
+                if (numero_urgence && numero_urgence !== '-') tooltipContent += `<strong>N° Urgence:</strong> ${numero_urgence}<br>`;
+                if (service && service !== '-') tooltipContent += `<strong>Service:</strong> ${service}`;
+
+                if (tooltipContent.endsWith('<br>')) {
+                    tooltipContent = tooltipContent.slice(0, -4);
                 }
+
+                if (tooltipContent) {
+                    tooltip.html(tooltipContent).css({
+                        display: 'block',
+                        left: e.pageX + 15,
+                        top: e.pageY + 15
+                    }).stop().show();
+                }
+            }
+        }).on('mouseleave', 'tr', function() {
+            tooltip.stop().hide();
+        }).on('mousemove', 'tr', function(e) {
+            tooltip.css({
+                left: e.pageX + 15,
+                top: e.pageY + 15
             });
         });
 
+        // Intercepter la soumission du formulaire
+        $('form').on('submit', function(e) {
+            e.preventDefault();
+            submitForm();
+        });
+
         function submitForm() {
-            // Récupérer les données du formulaire
-            var formData = $('form').serialize();
-            
-            // Envoyer la requête AJAX
+            var formData = new FormData($('form')[0]);
+            const action = formData.get('action');
+
+            // Pour un nouvel employé, on vérifie les doublons
+            if (action === 'ajouter') {
+                const nom = formData.get('nom');
+                const prenoms = formData.get('prenoms');
+
+                $.ajax({
+                    url: 'check_duplicate_employee.php',
+                    method: 'GET',
+                    data: { nom: nom, prenoms: prenoms },
+                    success: function(response) {
+                        if (response.exists) {
+                            alert(response.message + "\n\n" + "Détails: " + response.employee.nom + " " + response.employee.prenoms + ", Poste: " + response.employee.poste);
+                        } else {
+                            sendFormData(formData);
+                        }
+                    },
+                    error: function() {
+                        showMessage('Erreur lors de la vérification des doublons.', 'error');
+                    }
+                });
+            } else {
+                sendFormData(formData);
+            }
+        }
+
+        function sendFormData(formData) {
             $.ajax({
                 url: 'gerer_employes.php',
                 method: 'POST',
                 data: formData,
+                processData: false,
+                contentType: false,
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        // Afficher le message de succès
                         showMessage(response.message, 'success');
-                        
-                        // Réinitialiser le formulaire
                         resetForm();
-                        
-                        // Recharger la liste des employés
-                        reloadEmployeeList();
+                        table.ajax.reload(null, false); // Recharger sans réinitialiser la pagination
                     } else {
-                        // Afficher le message d'erreur
                         showMessage(response.message, 'error');
                     }
                 },
-                error: function(xhr, status, error) {
-                    showMessage('Une erreur est survenue: ' + error, 'error');
+                error: function() {
+                    showMessage('Une erreur de communication est survenue.', 'error');
                 }
             });
         }
@@ -1173,74 +1216,6 @@ function calculerAnnees($date_embauche) {
                     $(this).remove();
                 });
             }, 5000);
-        }
-
-        function reloadEmployeeList() {
-            $.ajax({
-                url: 'get_employees_list.php',
-                method: 'GET',
-                data: { 
-                    draw: 1,
-                    length: $('.employee-table').DataTable().page.len(),
-                    start: 0
-                },
-                success: function(response) {
-                    if (response.error) {
-                        showMessage(response.error, 'error');
-                        return;
-                    }
-                    
-                    // Détruire et réinitialiser la table
-                    var table = $('.employee-table').DataTable();
-                    table.destroy();
-                    
-                    // Vider et remplir le tbody avec les nouvelles données
-                    var tbody = $('.employee-table tbody');
-                    tbody.empty();
-                    
-                    response.data.forEach(function(row) {
-                        tbody.append(
-                            '<tr>' +
-                            '<td>' + row[0] + '</td>' + // nom
-                            '<td>' + row[1] + '</td>' + // prenoms
-                            '<td>' + row[2] + '</td>' + // telephone
-                            '<td>' + row[3] + '</td>' + // email
-                            '<td>' + row[4] + '</td>' + // projet
-                            '<td>' + row[5] + '</td>' + // type_contrat
-                            '<td>' + row[6] + '</td>' + // poste
-                            '<td>' + row[10] + '</td>' + // actions
-                            '</tr>'
-                        );
-                    });
-                    
-                    // Réinitialiser DataTables
-                    $('.employee-table').DataTable({
-                        responsive: true,
-                        language: {
-                            url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
-                        },
-                        pageLength: 10,
-                        order: [[0, 'asc']],
-                        scrollX: false,
-                        columnDefs: [
-                            {
-                                targets: -1,
-                                orderable: false,
-                                searchable: false
-                            }
-                        ],
-                        drawCallback: function() {
-                            initializeActionButtons();
-                        }
-                    });
-                    
-                    // Mettre à jour le compteur d'employés
-                    $('.employee-count').text(response.recordsTotal + ' employé(s)');
-                },
-                error: function(xhr, status, error) {
-                    showMessage('Erreur lors du rechargement de la liste: ' + error, 'error');
-                }
-            });
         }
 
         function updateProjectFilter(employees) {
@@ -1302,6 +1277,15 @@ function calculerAnnees($date_embauche) {
                     // Remplir le formulaire avec les données
                     $('#nom').val(employee.nom);
                     $('#prenoms').val(employee.prenoms);
+                    $('#adresse').val(employee.adresse || '');
+                    if (employee.sexe === 'Homme') {
+                        $('#sexe_homme').prop('checked', true);
+                    } else if (employee.sexe === 'Femme') {
+                        $('#sexe_femme').prop('checked', true);
+                    } else {
+                        $('#sexe_homme').prop('checked', false);
+                        $('#sexe_femme').prop('checked', false);
+                    }
                     $('#email').val(employee.email);
                     $('#telephone').val(employee.telephone);
                     $('#numero_urgence').val(employee.numero_urgence);

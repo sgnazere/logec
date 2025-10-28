@@ -6,32 +6,32 @@ require_once 'expire_license.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['license'])) {
-        $license = json_decode($_POST['license'], true);
+        $license_string = $_POST['license'];
+        $license = json_decode($license_string, true);
         
-        if ($license && isset($license['data']) && isset($license['signature'])) {
+        // Valider le format de base de la licence
+        if (json_last_error() === JSON_ERROR_NONE && isset($license['data']) && isset($license['signature'])) {
+
             // Créer le répertoire config s'il n'existe pas
-            if (!file_exists(__DIR__ . '/config')) {
-                mkdir(__DIR__ . '/config', 0777, true);
+            $configDir = __DIR__ . '/config';
+            if (!file_exists($configDir)) {
+                mkdir($configDir, 0755, true);
             }
             
-            // Sauvegarder la licence
-            file_put_contents(__DIR__ . '/config/license.txt', json_encode($license));
-            
-            // Vérifier immédiatement la licence
-            $check = checkLicenseExpiration();
-            
-            if ($check['valid']) {
-                $_SESSION['success_message'] = "Licence installée avec succès !";
+            // Sauvegarder la licence dans le fichier
+            $license_path = $configDir . '/license.txt';
+            if (file_put_contents($license_path, $license_string)) {
+                $_SESSION['success_message'] = "Licence enregistrée avec succès. La validité sera vérifiée.";
                 header('Location: index.php');
                 exit;
             } else {
-                $error_message = $check['message'];
+                $error_message = "Erreur : Impossible d'écrire le fichier de licence.";
             }
         } else {
-            $error_message = "Format de licence invalide";
+            $error_message = "Format de licence invalide. Assurez-vous de copier toute la chaîne JSON.";
         }
     } else {
-        $error_message = "Veuillez entrer une licence";
+        $error_message = "Veuillez entrer une licence.";
     }
 }
 ?>
